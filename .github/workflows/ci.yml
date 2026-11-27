@@ -226,9 +226,13 @@ jobs:
           set -euo pipefail
           mapfile -t MODULES < <(python3 scripts/ci_partition_cells.py top)
           echo "top modules: ${#MODULES[@]}"
-          for m in "${MODULES[@]}"; do
-            lake build "$m"
-          done
+          # One invocation, not a serial for-loop: each `lake build m` re-traverses
+          # the whole import closure, and 20 such traversals pushed run 45890018393
+          # to [5453/5466] (13 targets from green) at the 360-minute wall. A single
+          # `lake build m1..m20` traverses the closure once and schedules all twenty
+          # modules together (lake resolves dependency order, Theorem410 last), so the
+          # same oleans are produced without the redundant per-module re-checks.
+          lake build "${MODULES[@]}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: top-oleans
